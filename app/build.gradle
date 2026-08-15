@@ -47,20 +47,9 @@ android {
 		}
 		resValue 'string', 'tg_backup_bot_token', localProperties.getProperty('tg_backup_bot_token', '')
 	}
-	signingConfigs {
-		debugFixed {
-			// Stable debug key committed to the repo so every CI build is signed
-			// identically and the APK can update in place across builds.
-			storeFile file('debug-fixed.keystore')
-			storePassword 'android'
-			keyAlias 'androiddebugkey'
-			keyPassword 'android'
-		}
-	}
 	buildTypes {
 		debug {
 			applicationIdSuffix = '.debug'
-			signingConfig signingConfigs.debugFixed
 		}
 		release {
 			minifyEnabled true
