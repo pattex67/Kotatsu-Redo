@@ -7,6 +7,9 @@ on:
     paths-ignore:
       - '**/*.md'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,10 +36,29 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp $(find app/build/outputs/apk/debug -name "*.apk" | head -1) out/Kotatsu-Redo-mangas-origines-fix.apk
+
+      - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: kotatsu-redo-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: out/*.apk
           if-no-files-found: error
+
+      - name: Publish Release with APK
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-latest
+          name: "Debug build (mangas-origines fix)"
+          body: |
+            Build de test avec le correctif **mangas-origines.fr** (chapitres + images).
+            Compile depuis la branche `devel` + parser `pattex67/kotatsu-parsers-redo@30f315337b`.
+
+            Installe le .apk ci-dessous (active "Sources inconnues" sur Android).
+          prerelease: true
+          files: out/*.apk
