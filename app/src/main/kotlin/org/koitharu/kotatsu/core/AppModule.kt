@@ -15,6 +15,7 @@ import coil3.disk.directory
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.allowHardware
 import coil3.request.allowRgb565
 import coil3.svg.SvgDecoder
 import coil3.util.DebugLogger
@@ -127,6 +128,9 @@ interface AppModule {
 				.diskCache(diskCacheFactory)
 				.logger(if (BuildConfig.DEBUG) DebugLogger() else null)
 				.allowRgb565(context.isLowRamDevice())
+				// Force software image decoding: some SoCs (e.g. MediaTek's hardware JPEG
+				// decoder libjpeg-alpha.so) segfault on certain covers, crashing the whole app.
+				.allowHardware(false)
 				.eventListener(captchaHandler)
 				.components {
 					add(
