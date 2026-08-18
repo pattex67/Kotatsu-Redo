@@ -1,0 +1,76 @@
+name: Probe MangasOrigines
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect mangas-origines description DOM
+        run: |
+          pip install -q beautifulsoup4 soupsieve lxml requests
+          python3 - <<'PY'
+          import re, requests
+          from bs4 import BeautifulSoup
+
+          UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+          S = requests.Session()
+          S.headers.update({"User-Agent": UA, "Accept-Language": "fr"})
+
+          def get(url):
+              try:
+                  r = S.get(url, timeout=30)
+                  return r.status_code, r.text
+              except Exception as e:
+                  return None, "ERR %r" % e
+
+          SELECT_DESC = "div.description-summary div.summary__content, div.summary_content div.post-content_item > h5 + div, div.summary_content div.manga-excerpt, div.post-content div.manga-summary, div.post-content div.desc, div.c-page__content div.summary__content"
+
+          code, html = get("https://mangas-origines.fr/")
+          print("HOME status:", code, "len", len(html))
+          if code != 200:
+              print("---- not accessible, first 400 chars ----")
+              print(html[:400]); raise SystemExit(0)
+
+          soup = BeautifulSoup(html, "lxml")
+          links = []
+          for a in soup.select('a[href*="/oeuvre/"]'):
+              href = a.get("href", "")
+              m = re.search(r"(https?://[^\"']*?/oeuvre/[^\"'/]+/)", href)
+              if m and m.group(1) not in links:
+                  links.append(m.group(1))
+          print("found oeuvre links:", len(links))
+
+          for url in links[:8]:
+              c, h = get(url)
+              if c != 200:
+                  print("\n==== %s status=%s (skip)" % (url, c)); continue
+              s = BeautifulSoup(h, "lxml")
+              matched = s.select(SELECT_DESC)
+              txt = " ".join(x.get_text(" ", strip=True) for x in matched)
+              # detect type/genres
+              genres = [g.get_text(strip=True) for g in s.select('div.genres-content a, div.post-content_item:contains("Type") a')]
+              print("\n==== %s" % url)
+              print("  selectDesc matched=%d  textlen=%d" % (len(matched), len(txt)))
+              print("  genres/type:", genres[:8])
+              if len(txt) < 20:
+                  # description not found by current selectors -> hunt for it
+                  print("  !!! NO DESCRIPTION via selectDesc — hunting:")
+                  for kw in ["Résumé", "Synopsis", "résumé", "synopsis"]:
+                      for el in s.find_all(string=re.compile(kw)):
+                          parent = el.parent
+                          # climb a couple levels and dump the following block
+                          block = parent.parent if parent else None
+                          if block:
+                              print("    [heading '%s'] container=<%s class=%r>" % (
+                                  kw, block.name, block.get("class")))
+                              print("      html:", str(block)[:500].replace("\n", " "))
+                              break
+                  # also dump any element whose class mentions summary/description/excerpt/content
+                  for el in s.select('[class*="summary"], [class*="description"], [class*="excerpt"], [class*="synopsis"]'):
+                      cls = el.get("class")
+                      t = el.get_text(" ", strip=True)
+                      if t and len(t) > 40:
+                          print("    candidate <%s class=%r> textlen=%d : %s" % (el.name, cls, len(t), t[:120]))
+          PY
