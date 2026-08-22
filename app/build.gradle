@@ -207,7 +207,6 @@ dependencies {
 
 	implementation libs.conscrypt.android
 
-	debugImplementation libs.leakcanary.android
 	nightlyImplementation libs.leakcanary.android
 	debugImplementation libs.workinspector
 
