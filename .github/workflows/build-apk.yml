@@ -1,0 +1,73 @@
+name: Build Debug APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ devel ]
+    paths-ignore:
+      - '**/*.md'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Install nothing by default: the action's default package set includes the
+          # obsolete `tools` package, which Google removed from the SDK repo, making
+          # sdkmanager exit 1. The explicit step below installs what the build needs.
+          packages: ''
+
+      - name: Install SDK platform 37 and build-tools
+        run: |
+          yes | sdkmanager "platforms;android-37" "build-tools;35.0.0" >/dev/null || true
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp $(find app/build/outputs/apk/debug -name "*.apk" | head -1) out/Kotatsu-Redo-mangas-origines-fix.apk
+
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotatsu-redo-debug-apk
+          path: out/*.apk
+          if-no-files-found: error
+
+      - name: Publish Release with APK
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-latest
+          name: "Debug build (RimuScans + mangas-origines)"
+          body: |
+            Build de test avec :
+            - **RimuScans** : correctif des images du lecteur (l'optimiseur `/_next/image`
+              renvoyait HTTP 400 à cause du `?v=...` anti-cache).
+            - **mangas-origines.fr** : correctif chapitres + images.
+
+            Compile depuis la branche `devel` + parser `pattex67/kotatsu-parsers-redo@55196806da`.
+
+            Installe le .apk ci-dessous (active "Sources inconnues" sur Android).
+          prerelease: true
+          files: out/*.apk

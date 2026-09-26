@@ -12,7 +12,7 @@ import org.koitharu.kotatsu.core.BaseApp
 class KotatsuApp : BaseApp() {
 
 	var isLeakCanaryEnabled: Boolean
-		get() = getDebugPreferences(this).getBoolean(KEY_LEAK_CANARY, true)
+		get() = getDebugPreferences(this).getBoolean(KEY_LEAK_CANARY, false)
 		set(value) {
 			getDebugPreferences(this).edit { putBoolean(KEY_LEAK_CANARY, value) }
 			configureLeakCanary()
@@ -25,6 +25,9 @@ class KotatsuApp : BaseApp() {
 	}
 
 	private fun configureLeakCanary() {
+		// Off by default (dumpHeap=false) so the canary never appears. Do NOT touch the
+		// launcher icon here: this runs from attachBaseContext, before LeakCanary is
+		// initialized, and calling into it that early crashes the app on startup.
 		LeakCanary.config = LeakCanary.config.copy(
 			dumpHeap = isLeakCanaryEnabled,
 		)
